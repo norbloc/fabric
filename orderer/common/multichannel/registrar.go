@@ -717,7 +717,7 @@ func (r *Registrar) ChannelInfo(channelID string) (types.ChannelInfo, error) {
 
 // JoinChannel instructs the orderer to create a channel and join it with the provided config block.
 // The URL field is empty, and is to be completed by the caller.
-func (r *Registrar) JoinChannel(channelID string, configBlock *cb.Block, isAppChannel bool) (info types.ChannelInfo, err error) {
+func (r *Registrar) JoinChannel(channelID string, configBlock *cb.Block, isAppChannel bool, firstBlockNum uint64) (info types.ChannelInfo, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -790,6 +790,7 @@ func (r *Registrar) JoinChannel(channelID string, configBlock *cb.Block, isAppCh
 			}
 			chain.start()
 		}
+		info.FirstBlockNum = firstBlockNum
 		return info, err
 	}
 
@@ -797,6 +798,7 @@ func (r *Registrar) JoinChannel(channelID string, configBlock *cb.Block, isAppCh
 	if err != nil {
 		return info, errors.WithMessage(err, "failed to create follower")
 	}
+	info.FirstBlockNum = firstBlockNum
 
 	fChain.Start()
 	logger.Infof("Joining channel: %v", info)

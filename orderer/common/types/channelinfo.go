@@ -79,6 +79,8 @@ type ChannelInfo struct {
 	// For non cluster consensus types (solo, kafka) it is "active".
 	// Possible values:  “onboarding”, ”active”, "inactive".
 	Status Status `json:"status"`
+	// First block in the channel stored in local storage ("pruning" feature)
+	FirstBlockNum uint64 `json:"firstBlock"`
 	// Current block height.
 	Height uint64 `json:"height"`
 }

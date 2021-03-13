@@ -13,6 +13,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
@@ -29,6 +30,7 @@ const (
 	URLBaseV1              = "/participation/v1/"
 	URLBaseV1Channels      = URLBaseV1 + "channels"
 	FormDataConfigBlockKey = "config-block"
+	FormDataFromBlockKey   = "from-block"
 
 	channelIDKey        = "channelID"
 	urlWithChannelIDKey = URLBaseV1Channels + "/{" + channelIDKey + "}"
@@ -48,7 +50,7 @@ type ChannelManagement interface {
 
 	// JoinChannel instructs the orderer to create a channel and join it with the provided config block.
 	// The URL field is empty, and is to be completed by the caller.
-	JoinChannel(channelID string, configBlock *cb.Block, isAppChannel bool) (types.ChannelInfo, error)
+	JoinChannel(channelID string, configBlock *cb.Block, isAppChannel bool, firstBlockNum uint64) (types.ChannelInfo, error)
 
 	// RemoveChannel instructs the orderer to remove a channel.
 	RemoveChannel(channelID string) error
@@ -159,30 +161,32 @@ func (h *HTTPHandler) serveJoin(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	block := h.multipartFormDataBodyToBlock(params, req, resp)
-	if block == nil {
+	configBlock, firstBlockNum := h.multipartFormDataBodyToBlock(params, req, resp)
+	if configBlock == nil {
 		return
 	}
 
-	channelID, isAppChannel, err := ValidateJoinBlock(block)
+	channelID, isAppChannel, err := ValidateJoinBlock(configBlock)
 	if err != nil {
 		h.sendResponseJsonError(resp, http.StatusBadRequest, errors.WithMessage(err, "invalid join block"))
 		return
 	}
 
-	info, err := h.registrar.JoinChannel(channelID, block, isAppChannel)
+	info, err := h.registrar.JoinChannel(channelID, configBlock, isAppChannel, firstBlockNum)
 	if err != nil {
 		h.sendJoinError(err, resp)
 		return
 	}
 	info.URL = path.Join(URLBaseV1Channels, info.Name)
 
-	h.logger.Debugf("Successfully joined channel: %s", info.URL)
+	h.logger.Debugf("Successfully joined channel: %s, starting from block %d", info.URL, info.FirstBlockNum)
 	h.sendResponseCreated(resp, info.URL, info)
 }
 
-// Expect a multipart/form-data with a single part, of type file, with key FormDataConfigBlockKey.
-func (h *HTTPHandler) multipartFormDataBodyToBlock(params map[string]string, req *http.Request, resp http.ResponseWriter) *cb.Block {
+// Expect a multipart/form-data with two parts.
+// First part is always present, of type file, with key FormDataConfigBlockKey.
+// Second part is optional, key FormDataFromBlockKey, holds the number of first block to replicate, default = 0.
+func (h *HTTPHandler) multipartFormDataBodyToBlock(params map[string]string, req *http.Request, resp http.ResponseWriter) (*cb.Block, uint64) {
 	boundary := params["boundary"]
 	reader := multipart.NewReader(
 		http.MaxBytesReader(resp, req.Body, int64(h.config.MaxRequestBodySize)),
@@ -191,30 +195,39 @@ func (h *HTTPHandler) multipartFormDataBodyToBlock(params map[string]string, req
 	form, err := reader.ReadForm(2 * int64(h.config.MaxRequestBodySize))
 	if err != nil {
 		h.sendResponseJsonError(resp, http.StatusBadRequest, errors.Wrap(err, "cannot read form from request body"))
-		return nil
+		return nil, 0
 	}
 
 	if _, exist := form.File[FormDataConfigBlockKey]; !exist {
 		h.sendResponseJsonError(resp, http.StatusBadRequest, errors.Errorf("form does not contains part key: %s", FormDataConfigBlockKey))
-		return nil
+		return nil, 0
 	}
 
-	if len(form.File) != 1 || len(form.Value) != 0 {
+	if len(form.File) != 1 || len(form.Value) > 1 {
 		h.sendResponseJsonError(resp, http.StatusBadRequest, errors.New("form contains too many parts"))
-		return nil
+		return nil, 0
+	}
+
+	var firstBlockNum uint64 = 0
+	if fromBlockString, exist := form.Value[FormDataFromBlockKey]; exist {
+		firstBlockNum, err = strconv.ParseUint(fromBlockString[0], 10, 64)
+		if err != nil {
+			h.sendResponseJsonError(resp, http.StatusBadRequest, errors.Wrapf(err, "can not parse part %s from request body", FormDataFromBlockKey))
+			return nil, 0
+		}
 	}
 
 	fileHeader := form.File[FormDataConfigBlockKey][0]
 	file, err := fileHeader.Open()
 	if err != nil {
 		h.sendResponseJsonError(resp, http.StatusBadRequest, errors.Wrapf(err, "cannot open file part %s from request body", FormDataConfigBlockKey))
-		return nil
+		return nil, 0
 	}
 
 	blockBytes, err := ioutil.ReadAll(file)
 	if err != nil {
 		h.sendResponseJsonError(resp, http.StatusBadRequest, errors.Wrapf(err, "cannot read file part %s from request body", FormDataConfigBlockKey))
-		return nil
+		return nil, 0
 	}
 
 	block := &cb.Block{}
@@ -222,10 +235,10 @@ func (h *HTTPHandler) multipartFormDataBodyToBlock(params map[string]string, req
 	if err != nil {
 		h.logger.Debugf("Failed to unmarshal blockBytes: %s", err)
 		h.sendResponseJsonError(resp, http.StatusBadRequest, errors.Wrapf(err, "cannot unmarshal file part %s into a block", FormDataConfigBlockKey))
-		return nil
+		return nil, 0
 	}
 
-	return block
+	return block, firstBlockNum
 }
 
 func (h *HTTPHandler) extractChannelID(req *http.Request, resp http.ResponseWriter) (string, error) {
