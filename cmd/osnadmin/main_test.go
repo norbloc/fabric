@@ -43,6 +43,7 @@ var _ = Describe("osnadmin", func() {
 		tlsConfig             *tls.Config
 		ordererURL            string
 		channelID             string
+		fromBlockString       string
 	)
 
 	BeforeEach(func() {
@@ -57,6 +58,7 @@ var _ = Describe("osnadmin", func() {
 		clientKey = filepath.Join(tempDir, "client-key.pem")
 
 		channelID = "testing123"
+		fromBlockString = "12345"
 
 		config := localconfig.ChannelParticipation{
 			Enabled:            true,
@@ -519,6 +521,7 @@ var _ = Describe("osnadmin", func() {
 				"-o", ordererURL,
 				"-c", channelID,
 				"-b", blockPath,
+				"--from-block", fromBlockString,
 				"--ca-file", ordererCACert,
 				"--client-cert", clientCert,
 				"--client-key", clientKey,

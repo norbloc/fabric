@@ -13,12 +13,13 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"strconv"
 )
 
 // Joins an OSN to a new or existing channel.
-func Join(osnURL string, blockBytes []byte, caCertPool *x509.CertPool, tlsClientCert tls.Certificate) (*http.Response, error) {
+func Join(osnURL string, blockBytes []byte, caCertPool *x509.CertPool, tlsClientCert tls.Certificate, firstBlockNum *uint64) (*http.Response, error) {
 	url := fmt.Sprintf("%s/participation/v1/channels", osnURL)
-	req, err := createJoinRequest(url, blockBytes)
+	req, err := createJoinRequest(url, blockBytes, firstBlockNum)
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +27,7 @@ func Join(osnURL string, blockBytes []byte, caCertPool *x509.CertPool, tlsClient
 	return httpDo(req, caCertPool, tlsClientCert)
 }
 
-func createJoinRequest(url string, blockBytes []byte) (*http.Request, error) {
+func createJoinRequest(url string, blockBytes []byte, firstBlockNum *uint64) (*http.Request, error) {
 	joinBody := new(bytes.Buffer)
 	writer := multipart.NewWriter(joinBody)
 	part, err := writer.CreateFormFile("config-block", "config.block")
@@ -34,6 +35,15 @@ func createJoinRequest(url string, blockBytes []byte) (*http.Request, error) {
 		return nil, err
 	}
 	part.Write(blockBytes)
+
+	if firstBlockNum != nil {
+		fromBlockString := strconv.FormatUint(*firstBlockNum, 10)
+		err := writer.WriteField("from-block", fromBlockString)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	err = writer.Close()
 	if err != nil {
 		return nil, err

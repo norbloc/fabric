@@ -51,6 +51,7 @@ func executeForArgs(args []string) (output string, exit int, err error) {
 	join := channel.Command("join", "Join an Ordering Service Node (OSN) to a channel. If the channel does not yet exist, it will be created.")
 	joinChannelID := join.Flag("channelID", "Channel ID").Short('c').Required().String()
 	configBlockPath := join.Flag("config-block", "Path to the file containing an up-to-date config block for the channel").Short('b').Required().String()
+	firstBlockNum := join.Flag("from-block", "Number of the first block to start replication from").Uint64()
 
 	list := channel.Command("list", "List channel information for an Ordering Service Node (OSN). If the channelID flag is set, more detailed information will be provided for that channel.")
 	listChannelID := list.Flag("channelID", "Channel ID").Short('c').String()
@@ -113,7 +114,7 @@ func executeForArgs(args []string) (output string, exit int, err error) {
 
 	switch command {
 	case join.FullCommand():
-		resp, err = osnadmin.Join(osnURL, marshaledConfigBlock, caCertPool, tlsClientCert)
+		resp, err = osnadmin.Join(osnURL, marshaledConfigBlock, caCertPool, tlsClientCert, firstBlockNum)
 	case list.FullCommand():
 		if *listChannelID != "" {
 			resp, err = osnadmin.ListSingleChannel(osnURL, *listChannelID, caCertPool, tlsClientCert)
