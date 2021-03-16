@@ -73,7 +73,7 @@ type LedgerWriter interface {
 type LedgerFactory interface {
 	// GetOrCreate gets an existing ledger (if it exists)
 	// or creates it if it does not
-	GetOrCreate(chainID string) (LedgerWriter, error)
+	GetOrCreate(chainID string, firstBlockNum uint64) (LedgerWriter, error)
 }
 
 //go:generate mockery -dir . -name ChannelLister -case underscore -output mocks/
@@ -102,7 +102,7 @@ type Replicator struct {
 // IsReplicationNeeded returns whether replication is needed,
 // or the cluster node can resume standard boot flow.
 func (r *Replicator) IsReplicationNeeded() (bool, error) {
-	systemChannelLedger, err := r.LedgerFactory.GetOrCreate(r.SystemChannel)
+	systemChannelLedger, err := r.LedgerFactory.GetOrCreate(r.SystemChannel, 0)
 	if err != nil {
 		return false, err
 	}
@@ -135,7 +135,7 @@ func (r *Replicator) ReplicateChains() []string {
 	// Append the genesis blocks of the application channels we have into the ledger
 	for _, channels := range [][]ChannelGenesisBlock{pullHints.channelsToPull, pullHints.channelsNotToPull} {
 		for _, channel := range channels {
-			ledger, err := r.LedgerFactory.GetOrCreate(channel.ChannelName)
+			ledger, err := r.LedgerFactory.GetOrCreate(channel.ChannelName, 0)
 			if err != nil {
 				r.Logger.Panicf("Failed to create a ledger for channel %s: %v", channel.ChannelName, err)
 			}
@@ -189,7 +189,7 @@ func (r *Replicator) PullChannel(channel string) error {
 	defer puller.Close()
 	puller.Channel = channel
 
-	ledger, err := r.LedgerFactory.GetOrCreate(channel)
+	ledger, err := r.LedgerFactory.GetOrCreate(channel, 0)
 	if err != nil {
 		r.Logger.Panicf("Failed to create a ledger for channel %s: %v", channel, err)
 	}

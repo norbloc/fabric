@@ -15,7 +15,7 @@ import (
 type Factory interface {
 	// GetOrCreate gets an existing ledger (if it exists)
 	// or creates it if it does not
-	GetOrCreate(channelID string) (ReadWriter, error)
+	GetOrCreate(channelID string, firstBlockNum uint64) (ReadWriter, error)
 
 	// Remove removes an existing ledger
 	Remove(channelID string) error

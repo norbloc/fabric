@@ -86,7 +86,7 @@ At start up a new manager:
 		-- If index and file system are not in sync, syncs index from the FS
   *)  Updates blockchain info used by the APIs
 */
-func newBlockfileMgr(id string, conf *Conf, indexConfig *IndexConfig, indexStore *leveldbhelper.DBHandle) (*blockfileMgr, error) {
+func newBlockfileMgr(id string, conf *Conf, indexConfig *IndexConfig, indexStore *leveldbhelper.DBHandle, firstBlockNum uint64) (*blockfileMgr, error) {
 	logger.Debugf("newBlockfileMgr() initializing file-based block storage for ledger: %s ", id)
 	rootDir := conf.getLedgerBlockDir(id)
 	_, err := fileutil.CreateDirIfMissing(rootDir)
@@ -159,6 +159,16 @@ func newBlockfileMgr(id string, conf *Conf, indexConfig *IndexConfig, indexStore
 		bcInfo.CurrentBlockHash = protoutil.BlockHeaderHash(lastBlockHeader)
 		bcInfo.PreviousBlockHash = lastBlockHeader.PreviousHash
 	}
+
+	// Use the concept of "OSN snapshot" to implement "first block" feature
+	if firstBlockNum > bcInfo.Height {
+		bcInfo.Height = firstBlockNum
+		bcInfo.CurrentBlockHash = nil
+		bcInfo.PreviousBlockHash = nil
+		bcInfo.BootstrappingSnapshotInfo = &common.BootstrappingSnapshotInfo{}
+		bcInfo.BootstrappingSnapshotInfo.LastBlockInSnapshot = firstBlockNum - 1
+	}
+
 	mgr.bcInfo.Store(bcInfo)
 	return mgr, nil
 }

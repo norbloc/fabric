@@ -189,8 +189,8 @@ type ledgerFactory struct {
 	onBlockCommit cluster.BlockCommitFunc
 }
 
-func (lf *ledgerFactory) GetOrCreate(chainID string) (cluster.LedgerWriter, error) {
-	ledger, err := lf.Factory.GetOrCreate(chainID)
+func (lf *ledgerFactory) GetOrCreate(chainID string, firstBlockNum uint64) (cluster.LedgerWriter, error) {
+	ledger, err := lf.Factory.GetOrCreate(chainID, firstBlockNum)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func (vl *verifierLoader) loadVerifiers() verifiersByChannel {
 }
 
 func (vl *verifierLoader) loadVerifier(chain string) cluster.BlockVerifier {
-	ledger, err := vl.ledgerFactory.GetOrCreate(chain)
+	ledger, err := vl.ledgerFactory.GetOrCreate(chain, 0)
 	if err != nil {
 		vl.logger.Panicf("Failed obtaining ledger for channel %s", chain)
 	}

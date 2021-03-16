@@ -91,9 +91,9 @@ func NewProvider(conf *Conf, indexConfig *IndexConfig, metricsProvider metrics.P
 // Open opens a block store for given ledgerid.
 // If a blockstore is not existing, this method creates one
 // This method should be invoked only once for a particular ledgerid
-func (p *BlockStoreProvider) Open(ledgerid string) (*BlockStore, error) {
+func (p *BlockStoreProvider) Open(ledgerid string, firstBlockNum uint64) (*BlockStore, error) {
 	indexStoreHandle := p.leveldbProvider.GetDBHandle(ledgerid)
-	return newBlockStore(ledgerid, p.conf, p.indexConfig, indexStoreHandle, p.stats)
+	return newBlockStore(ledgerid, p.conf, p.indexConfig, indexStoreHandle, p.stats, firstBlockNum)
 }
 
 // ImportFromSnapshot initializes blockstore from a previously generated snapshot
