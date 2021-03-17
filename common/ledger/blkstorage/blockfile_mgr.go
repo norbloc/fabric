@@ -162,30 +162,45 @@ func newBlockfileMgr(id string, conf *Conf, indexConfig *IndexConfig, indexStore
 
 	// Use the concept of "OSN snapshot" to implement "first block" feature
 	if firstBlockNum > bcInfo.Height {
-		bcInfo.Height = firstBlockNum
-		bcInfo.CurrentBlockHash = nil
-		bcInfo.PreviousBlockHash = nil
+		if mgr.bootstrappingSnapshotInfo == nil {
+			mgr.bootstrappingSnapshotInfo = &BootstrappingSnapshotInfo{}
+		}
+		mgr.bootstrappingSnapshotInfo.LastBlockNum = firstBlockNum - 1
+		mgr.bootstrappingSnapshotInfo.LastBlockHash = nil
+		mgr.bootstrappingSnapshotInfo.PreviousBlockHash = nil
+
+		bcInfo.Height = mgr.bootstrappingSnapshotInfo.LastBlockNum + 1
+		bcInfo.CurrentBlockHash = mgr.bootstrappingSnapshotInfo.LastBlockHash
+		bcInfo.PreviousBlockHash = mgr.bootstrappingSnapshotInfo.PreviousBlockHash
 		bcInfo.BootstrappingSnapshotInfo = &common.BootstrappingSnapshotInfo{}
-		bcInfo.BootstrappingSnapshotInfo.LastBlockInSnapshot = firstBlockNum - 1
+		bcInfo.BootstrappingSnapshotInfo.LastBlockInSnapshot = mgr.bootstrappingSnapshotInfo.LastBlockNum
+
+		snapshotInfo := &SnapshotInfo{
+			LastBlockNum:      mgr.bootstrappingSnapshotInfo.LastBlockNum,
+			LastBlockHash:     mgr.bootstrappingSnapshotInfo.LastBlockHash,
+			PreviousBlockHash: mgr.bootstrappingSnapshotInfo.PreviousBlockHash,
+		}
+		if err := persistSnapshotInfo(id, snapshotInfo, conf, false); err != nil {
+			return nil, err
+		}
 	}
 
 	mgr.bcInfo.Store(bcInfo)
 	return mgr, nil
 }
 
-func bootstrapFromSnapshottedTxIDs(
+func persistSnapshotInfo(
 	ledgerID string,
-	snapshotDir string,
 	snapshotInfo *SnapshotInfo,
 	conf *Conf,
-	indexStore *leveldbhelper.DBHandle,
+	emptyCheck bool,
 ) error {
 	rootDir := conf.getLedgerBlockDir(ledgerID)
 	isEmpty, err := fileutil.CreateDirIfMissing(rootDir)
 	if err != nil {
 		return err
 	}
-	if !isEmpty {
+	if emptyCheck && !isEmpty {
 		return errors.Errorf("dir %s not empty", rootDir)
 	}
 
@@ -210,6 +225,19 @@ func bootstrapFromSnapshottedTxIDs(
 		return err
 	}
 	if err := fileutil.SyncDir(rootDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+func bootstrapFromSnapshottedTxIDs(
+	ledgerID string,
+	snapshotDir string,
+	snapshotInfo *SnapshotInfo,
+	conf *Conf,
+	indexStore *leveldbhelper.DBHandle,
+) error {
+	if err := persistSnapshotInfo(ledgerID, snapshotInfo, conf, true); err != nil {
 		return err
 	}
 	if err := importTxIDsFromSnapshot(snapshotDir, snapshotInfo.LastBlockNum, indexStore); err != nil {
