@@ -156,9 +156,12 @@ func (r *Registrar) init(consenters map[string]consensus.Consenter) {
 	// Make sure there are no empty ledgers without a corresponding join-block.
 	existingChannels := r.discoverLedgers(channelsWithJoinBlock)
 
-	// Scan for and initialize the system channel, if it exists.
-	// Note that there may be channels with empty ledgers, but always with a join block.
-	r.initSystemChannel(existingChannels)
+	// Search for system channel only if there are no join blocks
+	if len(channelsWithJoinBlock) == 0 {
+		// Scan for and initialize the system channel, if it exists.
+		// Note that there may be channels with empty ledgers, but always with a join block.
+		r.initSystemChannel(existingChannels)
+	}
 
 	// Initialize application channels, by creating either a consensus.Chain or a follower.Chain.
 	if r.systemChannelID == "" {

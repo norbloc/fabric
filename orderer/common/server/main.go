@@ -405,7 +405,7 @@ func extractSystemChannel(lf blockledger.Factory, bccsp bccsp.BCCSP) *cb.Block {
 		if err != nil {
 			logger.Panicf("Failed getting channel %v's ledger: %v", cID, err)
 		}
-		if channelLedger.Height() == 0 {
+		if channelLedger.Height() == 0 || channelLedger.FirstBlock() != 0 {
 			continue // Some channels may have an empty ledger and (possibly) a join-block, skip those
 		}
 
