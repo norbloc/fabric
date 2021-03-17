@@ -563,9 +563,10 @@ func (c *Chain) loadLastConfig() error {
 	if err != nil {
 		return errors.WithMessage(err, "chain does have appropriately encoded last config in its latest block")
 	}
+
 	lastConfig := c.ledgerResources.Block(index)
 	if lastConfig == nil {
-		return errors.WithMessagef(err, "could not retrieve config block from index %d", index)
+		return errors.Errorf("could not retrieve config block from index %d", index)
 	}
 	c.lastConfig = lastConfig
 	return nil
