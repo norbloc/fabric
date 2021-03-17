@@ -43,6 +43,8 @@ type Reader interface {
 	Iterator(startType *ab.SeekPosition) (Iterator, uint64)
 	// Height returns the number of blocks on the ledger
 	Height() uint64
+	// FirstBlock returns the first block number in the ledger, may be non-zero for prunned ledgers
+	FirstBlock() uint64
 }
 
 // Writer allows the caller to modify the ledger

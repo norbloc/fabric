@@ -103,7 +103,7 @@ func (lr *ledgerResources) VerifyBlockSignature(sd []*protoutil.SignedData, enve
 
 // Block returns a block with the following number, or nil if such a block doesn't exist.
 func (lr *ledgerResources) Block(number uint64) *common.Block {
-	if lr.Height() <= number {
+	if lr.Height() <= number || lr.FirstBlock() > number {
 		return nil
 	}
 	return blockledger.GetBlock(lr, number)

@@ -68,7 +68,7 @@ func (fl *FileLedger) Iterator(startPosition *ab.SeekPosition) (blockledger.Iter
 	var startingBlockNumber uint64
 	switch start := startPosition.Type.(type) {
 	case *ab.SeekPosition_Oldest:
-		startingBlockNumber = 0
+		startingBlockNumber = fl.FirstBlock()
 	case *ab.SeekPosition_Newest:
 		info, err := fl.blockStore.GetBlockchainInfo()
 		if err != nil {
@@ -106,6 +106,18 @@ func (fl *FileLedger) Height() uint64 {
 		logger.Panic(err)
 	}
 	return info.Height
+}
+
+// FirstBlock returns the first block number in the ledger, may be non-zero for prunned ledgers
+func (fl *FileLedger) FirstBlock() uint64 {
+	info, err := fl.blockStore.GetBlockchainInfo()
+	if err != nil {
+		logger.Panic(err)
+	}
+	if info.BootstrappingSnapshotInfo == nil {
+		return 0
+	}
+	return info.BootstrappingSnapshotInfo.LastBlockInSnapshot + 1
 }
 
 // Append a new block to the ledger
