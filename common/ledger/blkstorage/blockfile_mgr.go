@@ -325,10 +325,15 @@ func (mgr *blockfileMgr) addBlock(block *common.Block) error {
 	// This check is a simple bytes comparison and hence does not cause any observable performance penalty
 	// and may help in detecting a rare scenario if there is any bug in the ordering service.
 	if !bytes.Equal(block.Header.PreviousHash, bcInfo.CurrentBlockHash) {
-		return errors.Errorf(
-			"unexpected Previous block hash. Expected PreviousHash = [%x], PreviousHash referred in the latest block= [%x]",
-			bcInfo.CurrentBlockHash, block.Header.PreviousHash,
-		)
+		// WARNING: MUST REMOVE AFTER DEBUG!!!!!
+		if mgr.firstPossibleBlockNumberInBlockFiles() == bcInfo.Height {
+			logger.Critical("Skipping prevHash check in first block after snapshot! MUST BE REMOVED")
+		} else {
+			return errors.Errorf(
+				"unexpected Previous block hash. Expected PreviousHash = [%x], PreviousHash referred in the latest block= [%x]",
+				bcInfo.CurrentBlockHash, block.Header.PreviousHash,
+			)
+		}
 	}
 	blockBytes, info, err := serializeBlock(block)
 	if err != nil {

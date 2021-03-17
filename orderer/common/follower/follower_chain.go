@@ -503,15 +503,18 @@ func (c *Chain) pullUntilTarget(targetHeight uint64, updateEndpoints bool) (uint
 		c.logger.Debugf("Target height (%d) is <= to our ledger height (%d), skipping pulling", targetHeight, firstBlockToPull)
 		return 0, nil
 	}
-
 	var actualPrevHash []byte
 	// Initialize the actual previous hash
-	if firstBlockToPull > 0 {
+	firstBlockNum := c.ledgerResources.FirstBlock()
+	if firstBlockToPull > firstBlockNum {
 		prevBlock := c.ledgerResources.Block(firstBlockToPull - 1)
 		if prevBlock == nil {
 			return 0, errors.Errorf("cannot retrieve previous block %d", firstBlockToPull-1)
 		}
 		actualPrevHash = protoutil.BlockHeaderHash(prevBlock.Header)
+	} else if firstBlockToPull == firstBlockNum {
+		// TODO: implement this when/if we implement prevHash in snapshot feature
+		// actualPrevHash = ... fetch the prevHash from snapshot ...
 	}
 
 	// Pull until the latest height
@@ -527,7 +530,14 @@ func (c *Chain) pullUntilTarget(targetHeight uint64, updateEndpoints bool) (uint
 				return n, errors.WithMessagef(cluster.ErrRetryCountExhausted, "failed to pull block %d", seq)
 			}
 			reportedPrevHash := nextBlock.Header.PreviousHash
-			if (nextBlock.Header.Number > 0) && !bytes.Equal(reportedPrevHash, actualPrevHash) {
+
+			// TODO: remove this "if" statement when we implement prevHash in snapshot feature
+			if nextBlock.Header.Number == firstBlockNum {
+				actualPrevHash = reportedPrevHash
+			}
+			// END TODO
+
+			if (nextBlock.Header.Number >= firstBlockNum) && !bytes.Equal(reportedPrevHash, actualPrevHash) {
 				return n, errors.Errorf("block header mismatch on sequence %d, expected %x, got %x",
 					nextBlock.Header.Number, actualPrevHash, reportedPrevHash)
 			}
