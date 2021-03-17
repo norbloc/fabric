@@ -38,6 +38,9 @@ type LedgerResources interface {
 	// Height returns the number of blocks in the chain this channel is associated with.
 	Height() uint64
 
+	// FirstBlock returns the first block number in the ledger, may be non-zero for prunned ledgers
+	FirstBlock() uint64
+
 	// Append appends a new block to the ledger in its raw form.
 	Append(block *common.Block) error
 }
@@ -559,9 +562,29 @@ func (c *Chain) loadLastConfig() error {
 		return errors.New("ledger is empty")
 	}
 	lastBlock := c.ledgerResources.Block(height - 1)
+	if lastBlock == nil {
+		if c.ledgerResources.FirstBlock() == height {
+			// This is possible when we join the channel with pruning feature (snapshot)
+			// TODO: fetch lastConfig from snapshot (if available)
+			// Until we have lastConfig in snapshot, joinBlock is the next best substitute
+			//  (the only problem with joinBlock may be that it is not the very last config)
+			c.lastConfig = c.joinBlock
+			return nil
+		}
+		return errors.Errorf("could not retrieve last block from index %d", height-1)
+	}
+
 	index, err := protoutil.GetLastConfigIndexFromBlock(lastBlock)
 	if err != nil {
 		return errors.WithMessage(err, "chain does have appropriately encoded last config in its latest block")
+	}
+	if c.ledgerResources.FirstBlock() > index {
+		// This is possible when we join the channel with pruning feature (snapshot)
+		// TODO: fetch lastConfig from snapshot (if available)
+		// Until we have lastConfig in snapshot, joinBlock is the next best substitute
+		//  (the only problem with joinBlock may be that it is not the very last config)
+		c.lastConfig = c.joinBlock
+		return nil
 	}
 
 	lastConfig := c.ledgerResources.Block(index)
